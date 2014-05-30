@@ -51,6 +51,7 @@ module Control.Foldl (
     , any
     , sum
     , product
+    , variance
     , maximum
     , minimum
     , elem
@@ -124,7 +125,8 @@ import Prelude hiding
 -}
 data Fold a b = forall x . Fold (x -> a -> x) x (x -> b)
 
-data Pair a b = Pair !a !b
+data Pair a b   = Pair !a !b
+data Trio a b c = Trio !a !b !c
 
 instance Functor (Fold a) where
     fmap f (Fold step begin done) = Fold step begin (f . done)
@@ -284,6 +286,19 @@ sum = Fold (+) 0 id
 product :: Num a => Fold a a
 product = Fold (*) 1 id
 {-# INLINABLE product #-}
+
+-- | Variance of a stream of numbers. This algorithm due to Knuth
+-- (http://www.johndcook.com/standard_deviation.html) is efficient and
+-- numerically stable.
+variance :: Fractional b => Fold b b
+variance = Fold go (Trio 0 0 0) (\(Trio k _m s) -> s/(k-1)) where
+  go (Trio kp mp sp) x =
+    let k = kp+1
+        m = mp + (x - mp)/k
+        s = sp + (x - mp)*(x - m)
+    in Trio k m s
+{-# INLINABLE variance #-}
+{-# SPECIALIZE variance :: Fold Double Double #-}
 
 -- | Computes the maximum element
 maximum :: Ord a => Fold a (Maybe a)
